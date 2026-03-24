@@ -1211,20 +1211,72 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 
     static int chirpAxis = 0;
     static bool shouldChirpAxisToggle = false;
+    static bool chirpJustStarted = false;
 
     float chirp = 0.0f;
     float sinarg = 0.0f;
     if (FLIGHT_MODE(CHIRP_MODE)) {
         shouldChirpAxisToggle = true;  // advance chirp axis on next !CHIRP_MODE
+
+        // Initialize autotune metrics on first chirp sample
+        if (!chirpJustStarted) {
+            chirpJustStarted = true;
+            pidRuntime.autotuneMetrics[chirpAxis].peakGyroResponse = 0.0f;
+            pidRuntime.autotuneMetrics[chirpAxis].rmsError = 0.0f;
+            pidRuntime.autotuneMetrics[chirpAxis].oscillationCount = 0;
+            pidRuntime.autotuneMetrics[chirpAxis].sampleCount = 0;
+            pidRuntime.autotuneMetrics[chirpAxis].dataValid = false;
+            pidRuntime.autotuneMetrics[chirpAxis].confidence = 0.0f;
+        }
+
         // update chirp signal
         if (chirpUpdate(&pidRuntime.chirp)) {
             chirp = pidRuntime.chirp.exc;
             sinarg = pidRuntime.chirp.sinarg;
+        } else if (pidRuntime.chirp.isFinished && !pidRuntime.autotuneMetrics[chirpAxis].dataValid) {
+            // Chirp just finished - finalize metrics (run once, guarded by dataValid)
+            if (pidRuntime.autotuneMetrics[chirpAxis].sampleCount > 0) {
+                // Finalize RMS error
+                pidRuntime.autotuneMetrics[chirpAxis].rmsError =
+                    sqrtf(pidRuntime.autotuneMetrics[chirpAxis].rmsError /
+                          pidRuntime.autotuneMetrics[chirpAxis].sampleCount);
+
+                // Calculate confidence (simple heuristic based on response quality)
+                float responseRatio = pidRuntime.autotuneMetrics[chirpAxis].peakGyroResponse /
+                                     pidRuntime.chirpAmplitude[chirpAxis];
+                if (responseRatio > 0.3f && responseRatio < 2.0f) {
+                    pidRuntime.autotuneMetrics[chirpAxis].confidence =
+                        100.0f * (1.0f - fabsf(1.0f - responseRatio));
+                } else {
+                    pidRuntime.autotuneMetrics[chirpAxis].confidence = 50.0f;
+                }
+
+                // Simple P gain estimation
+                float currentP = pidRuntime.pid[chirpAxis].kp;
+                if (responseRatio < 0.7f) {
+                    // Too sluggish - increase P
+                    pidRuntime.autotuneMetrics[chirpAxis].suggestedP = currentP * 1.15f;
+                } else if (responseRatio > 1.3f) {
+                    // Overshooting - decrease P
+                    pidRuntime.autotuneMetrics[chirpAxis].suggestedP = currentP * 0.90f;
+                } else {
+                    // Good response - minor adjustment
+                    pidRuntime.autotuneMetrics[chirpAxis].suggestedP = currentP * (0.95f / responseRatio);
+                }
+
+                // D gain suggestion (proportional to P)
+                float currentD = pidRuntime.pid[chirpAxis].kd;
+                pidRuntime.autotuneMetrics[chirpAxis].suggestedD =
+                    currentD * (pidRuntime.autotuneMetrics[chirpAxis].suggestedP / currentP);
+
+                pidRuntime.autotuneMetrics[chirpAxis].dataValid = true;
+            }
         }
     } else {
         if (shouldChirpAxisToggle) {
             // toggle chirp signal logic and increment to next axis for next run
             shouldChirpAxisToggle = false;
+            chirpJustStarted = false;
             chirpAxis = (++chirpAxis > FD_YAW) ? 0 : chirpAxis;
             // reset chirp signal generator
             chirpReset(&pidRuntime.chirp);
@@ -1312,6 +1364,34 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         const float gyroRate = gyro.gyroADCf[axis]; // Process variable from gyro output in deg/sec
 #ifdef USE_CHIRP
         currentPidSetpoint += currentChirp;
+
+        // Autotune: Collect metrics during chirp
+        if (FLIGHT_MODE(CHIRP_MODE) && axis == chirpAxis && chirp != 0.0f) {
+            static float lastError = 0.0f;
+
+            // Track peak gyro response
+            float absGyro = fabsf(gyroRate);
+            if (absGyro > pidRuntime.autotuneMetrics[axis].peakGyroResponse) {
+                pidRuntime.autotuneMetrics[axis].peakGyroResponse = absGyro;
+            }
+
+            // Accumulate squared error for RMS
+            float error = currentChirp - gyroRate;
+            pidRuntime.autotuneMetrics[axis].rmsError += error * error;
+
+            // Count oscillations (zero crossings)
+            if ((error > 0 && lastError < 0) || (error < 0 && lastError > 0)) {
+                pidRuntime.autotuneMetrics[axis].oscillationCount++;
+            }
+            lastError = error;
+
+            pidRuntime.autotuneMetrics[axis].sampleCount++;
+
+            // Output debug values for Rerun visualization
+            DEBUG_SET(DEBUG_CHIRP, 1, lrintf(gyroRate));           // Gyro response
+            DEBUG_SET(DEBUG_CHIRP, 2, lrintf(currentChirp));       // Chirp setpoint
+            DEBUG_SET(DEBUG_CHIRP, 3, lrintf(error));              // Tracking error
+        }
 #endif // USE_CHIRP
         float errorRate = currentPidSetpoint - gyroRate; // r - y
 #if defined(USE_ACC)

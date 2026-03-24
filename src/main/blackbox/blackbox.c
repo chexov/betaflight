@@ -1677,6 +1677,28 @@ static bool blackboxWriteSysinfo(void)
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_CHIRP_FREQUENCY_START_DECI_HZ, "%d", currentPidProfile->chirp_frequency_start_deci_hz);
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_CHIRP_FREQUENCY_END_DECI_HZ, "%d",   currentPidProfile->chirp_frequency_end_deci_hz);
         BLACKBOX_PRINT_HEADER_LINE(PARAM_NAME_CHIRP_TIME_SECONDS, "%d",            currentPidProfile->chirp_time_seconds);
+
+        // Autotune metrics (logged after chirp completion)
+        BLACKBOX_PRINT_HEADER_LINE("autotune_roll_peak_response", "%.2f",    pidRuntime.autotuneMetrics[FD_ROLL].peakGyroResponse);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_roll_rms_error", "%.2f",        pidRuntime.autotuneMetrics[FD_ROLL].rmsError);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_roll_oscillations", "%d",       pidRuntime.autotuneMetrics[FD_ROLL].oscillationCount);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_roll_confidence", "%.1f",       pidRuntime.autotuneMetrics[FD_ROLL].confidence);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_roll_suggested_p", "%.2f",      pidRuntime.autotuneMetrics[FD_ROLL].suggestedP);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_roll_suggested_d", "%.2f",      pidRuntime.autotuneMetrics[FD_ROLL].suggestedD);
+
+        BLACKBOX_PRINT_HEADER_LINE("autotune_pitch_peak_response", "%.2f",   pidRuntime.autotuneMetrics[FD_PITCH].peakGyroResponse);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_pitch_rms_error", "%.2f",       pidRuntime.autotuneMetrics[FD_PITCH].rmsError);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_pitch_oscillations", "%d",      pidRuntime.autotuneMetrics[FD_PITCH].oscillationCount);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_pitch_confidence", "%.1f",      pidRuntime.autotuneMetrics[FD_PITCH].confidence);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_pitch_suggested_p", "%.2f",     pidRuntime.autotuneMetrics[FD_PITCH].suggestedP);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_pitch_suggested_d", "%.2f",     pidRuntime.autotuneMetrics[FD_PITCH].suggestedD);
+
+        BLACKBOX_PRINT_HEADER_LINE("autotune_yaw_peak_response", "%.2f",     pidRuntime.autotuneMetrics[FD_YAW].peakGyroResponse);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_yaw_rms_error", "%.2f",         pidRuntime.autotuneMetrics[FD_YAW].rmsError);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_yaw_oscillations", "%d",        pidRuntime.autotuneMetrics[FD_YAW].oscillationCount);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_yaw_confidence", "%.1f",        pidRuntime.autotuneMetrics[FD_YAW].confidence);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_yaw_suggested_p", "%.2f",       pidRuntime.autotuneMetrics[FD_YAW].suggestedP);
+        BLACKBOX_PRINT_HEADER_LINE("autotune_yaw_suggested_d", "%.2f",       pidRuntime.autotuneMetrics[FD_YAW].suggestedD);
 #endif // USE_CHIRP
 
         // End of Betaflight controller parameters

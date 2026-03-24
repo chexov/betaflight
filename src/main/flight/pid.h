@@ -549,6 +549,18 @@ typedef struct pidRuntime_s {
     float chirpFrequencyStartHz;
     float chirpFrequencyEndHz;
     float chirpTimeSeconds;
+
+    // Autotune: Real-time metrics collected during chirp
+    struct {
+        float peakGyroResponse;      // Max gyro deviation during chirp (deg/s)
+        float rmsError;              // RMS tracking error
+        uint16_t oscillationCount;   // Number of zero-crossings
+        uint32_t sampleCount;        // Number of samples collected
+        bool dataValid;              // Chirp completed successfully
+        float confidence;            // 0-100% confidence in data quality
+        float suggestedP;            // Suggested P gain (calculated at end)
+        float suggestedD;            // Suggested D gain (calculated at end)
+    } autotuneMetrics[3];            // Per axis (roll, pitch, yaw)
 #endif // USE_CHIRP
 } pidRuntime_t;
 
